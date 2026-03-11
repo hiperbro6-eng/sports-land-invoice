@@ -302,7 +302,7 @@ export default function Page() {
 
     const dataUrl = await toJpeg(invoiceRef.current, {
       quality: 0.95,
-      pixelRatio: 2,
+      pixelRatio: 3,
       backgroundColor: "#ffffff",
       cacheBust: true,
     });
@@ -317,7 +317,7 @@ export default function Page() {
     if (!invoiceRef.current) return;
 
     const dataUrl = await toPng(invoiceRef.current, {
-      pixelRatio: 2,
+      pixelRatio: 3,
       backgroundColor: "#ffffff",
       cacheBust: true,
     });
@@ -631,10 +631,11 @@ document.body.removeChild(link);
             <div className="flex items-start justify-between border-b border-slate-300 pb-6 gap-6">
               <div className="flex items-center gap-4">
                 <img
-                  src="/logo.png"
-                  alt="The Sports Land Logo"
-                  className="h-20 w-20 rounded-xl object-contain"
-                />
+  src={typeof window !== "undefined" ? window.location.origin + "/logo.png" : "/logo.png"}
+  alt="The Sports Land Logo"
+  crossOrigin="anonymous"
+  className="h-20 w-20 rounded-xl object-contain"
+/>
                 <div>
                   <h1 className="text-3xl font-extrabold text-slate-900">
                     {BUSINESS.name}
