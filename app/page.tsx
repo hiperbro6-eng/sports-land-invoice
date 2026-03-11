@@ -330,15 +330,15 @@ async function downloadPDF() {
 
   pdf.addImage(dataUrl, "PNG", 0, 0, pageWidth, imgHeight);
 
-  const isIOS =
-    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   if (isIOS) {
-    // iPhone fix
+    // iPhone / iPad
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);
-    window.open(url);
+    window.location.href = url;
   } else {
+    // Desktop / Android
     pdf.save(`${invoiceNo}.pdf`);
   }
 }
