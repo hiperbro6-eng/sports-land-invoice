@@ -608,9 +608,9 @@ export default function Page() {
           <div
             ref={invoiceRef}
             style={{ backgroundColor: "#ffffff", color: "#0f172a" }}
-            className="mx-auto max-w-[900px] bg-white p-6 md:p-10"
+            className="mx-auto w-[860px] bg-white p-8"
           >
-            <div className="flex items-start justify-between border-b border-slate-300 pb-6">
+            <div className="flex items-start justify-between border-b border-slate-300 pb-6 gap-6">
               <div className="flex items-center gap-4">
                 <img
                   src="/logo.png"
@@ -635,7 +635,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="grid gap-8 py-8 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-8 py-8">
               <div>
                 <p className="mb-2 text-slate-500">Invoice to :</p>
                 <h3 className="text-1xl font-bold text-slate-900">
