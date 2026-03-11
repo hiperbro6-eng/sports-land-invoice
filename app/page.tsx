@@ -638,7 +638,7 @@ export default function Page() {
             <div className="grid gap-8 py-8 md:grid-cols-2">
               <div>
                 <p className="mb-2 text-slate-500">Invoice to :</p>
-                <h3 className="text-4xl font-bold text-slate-900">
+                <h3 className="text-1xl font-bold text-slate-900">
                   {customerName || "Customer Name"}
                 </h3>
                 <div className="mt-4 space-y-1 text-slate-600">
