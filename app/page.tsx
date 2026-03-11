@@ -313,32 +313,35 @@ export default function Page() {
     link.click();
   }
 
-  async function downloadPDF() {
-    if (!invoiceRef.current) return;
+async function downloadPDF() {
+  if (!invoiceRef.current) return;
 
-    const dataUrl = await toPng(invoiceRef.current, {
-      pixelRatio: 3,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-    });
+  const dataUrl = await toPng(invoiceRef.current, {
+    pixelRatio: 3,
+    backgroundColor: "#ffffff",
+    cacheBust: true,
+  });
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const imgProps = pdf.getImageProperties(dataUrl);
-    const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pageWidth = pdf.internal.pageSize.getWidth();
 
-    pdf.addImage(dataUrl, "PNG", 0, 0, pageWidth, imgHeight);
+  const imgProps = pdf.getImageProperties(dataUrl);
+  const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
 
-const blob = pdf.output("blob");
-const url = URL.createObjectURL(blob);
+  pdf.addImage(dataUrl, "PNG", 0, 0, pageWidth, imgHeight);
 
-const link = document.createElement("a");
-link.href = url;
-link.download = `${invoiceNo}.pdf`;
-document.body.appendChild(link);
-link.click();
-document.body.removeChild(link);
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+  if (isIOS) {
+    // iPhone fix
+    const blob = pdf.output("blob");
+    const url = URL.createObjectURL(blob);
+    window.open(url);
+  } else {
+    pdf.save(`${invoiceNo}.pdf`);
   }
+}
 
   return (
     <div className="min-h-screen bg-[#eef2f7] p-4 md:p-8">
