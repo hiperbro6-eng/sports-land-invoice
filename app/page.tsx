@@ -194,7 +194,7 @@ export default function Page() {
   }
 
   function changeQty(productId: string, qty: number) {
-    if (qty < 1) qty = 1;
+    
 
     setSelectedItems((prev) =>
       prev.map((item) =>
@@ -332,7 +332,12 @@ export default function Page() {
 const blob = pdf.output("blob");
 const url = URL.createObjectURL(blob);
 
-window.open(url);
+const link = document.createElement("a");
+link.href = url;
+link.download = `${invoiceNo}.pdf`;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
   }
 
   return (
@@ -553,21 +558,30 @@ window.open(url);
                           </div>
 
                           {selected && (
-                            <div className="mt-3">
-                              <label className="mb-1 block text-sm font-medium">
-                                Quantity
-                              </label>
-                              <input
-                                type="number"
-                                min={1}
-                                value={selected.qty}
-                                onChange={(e) =>
-                                  changeQty(product.id, Number(e.target.value))
-                                }
-                                className="w-full rounded-xl border border-slate-300 px-4 py-2"
-                              />
-                            </div>
-                          )}
+  <div className="mt-3">
+    <label className="mb-1 block text-sm font-medium">
+      Quantity
+    </label>
+
+    <input
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  value={selected.qty === 0 ? "" : selected.qty}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "");
+
+    if (value === "") {
+      changeQty(selected.productId, 0);
+      return;
+    }
+
+    changeQty(selected.productId, Number(value));
+  }}
+  className="w-full rounded-xl border border-slate-300 px-4 py-2"
+/>
+  </div>
+)}
                         </>
                       )}
                     </div>
