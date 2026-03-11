@@ -301,11 +301,11 @@ export default function Page() {
     if (!invoiceRef.current) return;
 
     const dataUrl = await toJpeg(invoiceRef.current, {
-      quality: 0.95,
-      pixelRatio: 3,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-    });
+  quality: 0.95,
+  pixelRatio: 3,
+  backgroundColor: "#ffffff",
+  cacheBust: true,
+});
 
     const link = document.createElement("a");
     link.download = `${invoiceNo}.jpeg`;
@@ -313,8 +313,23 @@ export default function Page() {
     link.click();
   }
 
+function waitForImages(container: HTMLElement) {
+  const images = Array.from(container.querySelectorAll("img"));
+  return Promise.all(
+    images.map(
+      img =>
+        new Promise(resolve => {
+          if (img.complete) resolve(true);
+          else img.onload = img.onerror = () => resolve(true);
+        })
+    )
+  );
+}
+
 async function downloadPDF() {
   if (!invoiceRef.current) return;
+
+  await waitForImages(invoiceRef.current);
 
   const dataUrl = await toPng(invoiceRef.current, {
     pixelRatio: 3,
@@ -323,8 +338,8 @@ async function downloadPDF() {
   });
 
   const pdf = new jsPDF("p", "mm", "a4");
-  const pageWidth = pdf.internal.pageSize.getWidth();
 
+  const pageWidth = pdf.internal.pageSize.getWidth();
   const imgProps = pdf.getImageProperties(dataUrl);
   const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
 
@@ -333,12 +348,10 @@ async function downloadPDF() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   if (isIOS) {
-    // iPhone / iPad
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);
     window.location.href = url;
   } else {
-    // Desktop / Android
     pdf.save(`${invoiceNo}.pdf`);
   }
 }
@@ -629,15 +642,18 @@ async function downloadPDF() {
           <div
             ref={invoiceRef}
             style={{ backgroundColor: "#ffffff", color: "#0f172a" }}
-            className="mx-auto w-[860px] bg-white p-8"
+            className="mx-auto w-[794px] bg-white p-8"
           >
             <div className="flex items-start justify-between border-b border-slate-300 pb-6 gap-6">
               <div className="flex items-center gap-4">
                 <img
-  src={typeof window !== "undefined" ? window.location.origin + "/logo.png" : "/logo.png"}
+  src={typeof window !== "undefined"
+    ? window.location.origin + "/logo.png"
+    : "/logo.png"}
   alt="The Sports Land Logo"
   crossOrigin="anonymous"
-  className="h-20 w-20 rounded-xl object-contain"
+  style={{ display: "block" }}
+  className="h-20 w-20 object-contain"
 />
                 <div>
                   <h1 className="text-3xl font-extrabold text-slate-900">
@@ -742,7 +758,7 @@ async function downloadPDF() {
               </div>
             </div>
 
-            <div className="mt-16 grid gap-8 border-t border-slate-300 pt-6 md:grid-cols-3">
+            <div className="mt-16 grid grid-cols-3 gap-8 border-t border-slate-300 pt-6">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                   Phone
