@@ -628,7 +628,7 @@ export default function Page() {
               </div>
 
               <div className="text-right">
-                <h2 className="text-5xl font-extrabold tracking-[0.2em] text-blue-600">
+                <h2 className="text-3xl font-extrabold tracking-[0.2em] text-blue-600">
                   INVOICE
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">{BUSINESS.website}</p>
