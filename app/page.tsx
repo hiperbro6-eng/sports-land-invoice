@@ -328,7 +328,11 @@ export default function Page() {
     const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
 
     pdf.addImage(dataUrl, "PNG", 0, 0, pageWidth, imgHeight);
-    pdf.save(`${invoiceNo}.pdf`);
+
+const blob = pdf.output("blob");
+const url = URL.createObjectURL(blob);
+
+window.open(url);
   }
 
   return (
