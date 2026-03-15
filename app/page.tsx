@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
-import { toPng } from "html-to-image";
+import { toJpeg, toPng } from "html-to-image";
 
 type Product = {
   id: string;
@@ -30,7 +30,6 @@ type InvoiceRecord = {
 
 const BUSINESS = {
   name: "The Sports Land",
-  tagline: "QUALITY YOU NEED",
   website: "www.sportland.com",
   phone: "+94 72 929 958",
   email: "sportland@gmail.com",
@@ -38,12 +37,10 @@ const BUSINESS = {
   dueText: "On receipt",
 };
 
-const EXPORT_WIDTH = 1588;
-const EXPORT_HEIGHT = 1198;
-const PREVIEW_WIDTH = 794;
-const PREVIEW_MIN_HEIGHT = 599;
-
-const LOGO_PATH = "/logo.png";
+// paste your real base64 logo here if you want 100% safest iPhone export
+const LOGO_SRC = "/logo.png";
+// example:
+// const LOGO_SRC = "data:image/png;base64,PASTE_YOUR_BASE64_HERE";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-LK", {
@@ -65,87 +62,32 @@ function formatInvoiceDate(value: string) {
 function normalizePhoneForWhatsApp(phone: string) {
   const cleaned = phone.replace(/[^\d+]/g, "");
 
-  if (cleaned.startsWith("+")) return cleaned.slice(1);
-  if (cleaned.startsWith("94")) return cleaned;
-  if (cleaned.startsWith("0")) return `94${cleaned.slice(1)}`;
+  if (cleaned.startsWith("+")) {
+    return cleaned.slice(1);
+  }
+
+  if (cleaned.startsWith("94")) {
+    return cleaned;
+  }
+
+  if (cleaned.startsWith("0")) {
+    return `94${cleaned.slice(1)}`;
+  }
 
   return cleaned;
 }
 
 function waitForImages(container: HTMLElement) {
   const images = Array.from(container.querySelectorAll("img"));
-
   return Promise.all(
     images.map(
       (img) =>
         new Promise((resolve) => {
-          if (img.complete) {
-            resolve(true);
-          } else {
-            img.onload = img.onerror = () => resolve(true);
-          }
+          if (img.complete) resolve(true);
+          else img.onload = img.onerror = () => resolve(true);
         })
     )
   );
-}
-
-function dataUrlToBlob(dataUrl: string) {
-  const parts = dataUrl.split(",");
-  const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
-  const binary = atob(parts[1]);
-  const length = binary.length;
-  const array = new Uint8Array(length);
-
-  for (let i = 0; i < length; i += 1) {
-    array[i] = binary.charCodeAt(i);
-  }
-
-  return new Blob([array], { type: mime });
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Failed to convert blob to data URL"));
-    };
-
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function fetchLogoDataUrl() {
-  const response = await fetch(`${window.location.origin}${LOGO_PATH}`, {
-    cache: "force-cache",
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to load logo");
-  }
-
-  const blob = await response.blob();
-  return blobToDataUrl(blob);
-}
-
-function loadImageElement(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-async function downloadDataUrl(filename: string, dataUrl: string) {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
 
 export default function Page() {
@@ -177,7 +119,6 @@ export default function Page() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingCustomerHistory, setLoadingCustomerHistory] = useState(false);
   const [savingInvoice, setSavingInvoice] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -185,11 +126,7 @@ export default function Page() {
   }, []);
 
   async function loadInitialData() {
-    await Promise.all([
-      loadProducts(),
-      loadNextInvoiceNumber(),
-      loadCustomerHistory(""),
-    ]);
+    await Promise.all([loadProducts(), loadNextInvoiceNumber(), loadCustomerHistory("")]);
   }
 
   async function loadNextInvoiceNumber() {
@@ -207,8 +144,7 @@ export default function Page() {
 
     const lastInvoice = data?.invoice_no ?? "";
     const lastNumber = Number(lastInvoice.replace(/[^\d]/g, ""));
-    const nextNumber =
-      Number.isFinite(lastNumber) && lastNumber > 0 ? lastNumber + 1 : 1;
+    const nextNumber = Number.isFinite(lastNumber) && lastNumber > 0 ? lastNumber + 1 : 1;
 
     setInvoiceNo(`INV${String(nextNumber).padStart(4, "0")}`);
   }
@@ -243,9 +179,7 @@ export default function Page() {
 
     let query = supabase
       .from("invoices")
-      .select(
-        "id, invoice_no, customer_name, customer_phone, customer_address, invoice_date, total, created_at"
-      )
+      .select("id, invoice_no, customer_name, customer_phone, customer_address, invoice_date, total, created_at")
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -278,10 +212,7 @@ export default function Page() {
       return;
     }
 
-    const { error } = await supabase.from("products").insert({
-      name,
-      price,
-    });
+    const { error } = await supabase.from("products").insert({ name, price });
 
     if (error) {
       setMessage(`Add product failed: ${error.message}`);
@@ -336,19 +267,14 @@ export default function Page() {
   async function deleteProduct(productId: string) {
     setMessage("");
 
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", productId);
+    const { error } = await supabase.from("products").delete().eq("id", productId);
 
     if (error) {
       setMessage(`Delete failed: ${error.message}`);
       return;
     }
 
-    setSelectedItems((prev) =>
-      prev.filter((item) => item.productId !== productId)
-    );
+    setSelectedItems((prev) => prev.filter((item) => item.productId !== productId));
     setMessage("Product deleted.");
     await loadProducts();
   }
@@ -475,120 +401,7 @@ export default function Page() {
     setCustomerAddress(row.customer_address ?? "");
   }
 
-  async function buildFinalExportImage() {
-    if (!invoiceRef.current) {
-      throw new Error("Invoice not ready");
-    }
-
-    await waitForImages(invoiceRef.current);
-
-    const rawInvoiceDataUrl = await toPng(invoiceRef.current, {
-      pixelRatio: 1,
-      width: EXPORT_WIDTH,
-      height: EXPORT_HEIGHT,
-      canvasWidth: EXPORT_WIDTH,
-      canvasHeight: EXPORT_HEIGHT,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-      skipFonts: false,
-      style: {
-        transform: "none",
-      },
-    });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = EXPORT_WIDTH;
-    canvas.height = EXPORT_HEIGHT;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      throw new Error("Canvas not supported");
-    }
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
-
-    const invoiceImage = await loadImageElement(rawInvoiceDataUrl);
-    ctx.drawImage(invoiceImage, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
-
-    try {
-      const logoDataUrl = await fetchLogoDataUrl();
-      const logoImage = await loadImageElement(logoDataUrl);
-
-      // manually stamp logo for iPhone-safe export
-      // tuned to match your current invoice layout
-      ctx.drawImage(logoImage, 88, 56, 78, 78);
-    } catch {
-      // ignore logo overlay failure, invoice still exports
-    }
-
-    return canvas.toDataURL("image/png");
-  }
-
-  async function downloadJPEG() {
-    try {
-      setExporting(true);
-      const pngDataUrl = await buildFinalExportImage();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = EXPORT_WIDTH;
-      canvas.height = EXPORT_HEIGHT;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas not supported");
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
-
-      const img = await loadImageElement(pngDataUrl);
-      ctx.drawImage(img, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
-
-      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.96);
-      await downloadDataUrl(`${invoiceNo}.jpeg`, jpegDataUrl);
-    } catch (error) {
-      setMessage("JPEG export failed.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  async function downloadPDF() {
-    try {
-      setExporting(true);
-      const finalPngDataUrl = await buildFinalExportImage();
-
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "px",
-        format: [EXPORT_WIDTH, EXPORT_HEIGHT],
-      });
-
-      pdf.addImage(
-        finalPngDataUrl,
-        "PNG",
-        0,
-        0,
-        EXPORT_WIDTH,
-        EXPORT_HEIGHT
-      );
-
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-      if (isIOS) {
-        const blob = pdf.output("blob");
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
-      } else {
-        pdf.save(`${invoiceNo}.pdf`);
-      }
-    } catch (error) {
-      setMessage("PDF export failed.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  async function sendWhatsAppInvoice() {
+  function sendWhatsAppInvoice() {
     if (!customerPhone.trim()) {
       setMessage("Enter customer phone number first.");
       return;
@@ -599,48 +412,69 @@ export default function Page() {
       return;
     }
 
-    try {
-      setExporting(true);
+    const phone = normalizePhoneForWhatsApp(customerPhone);
+    const lines = invoiceItems
+      .map(
+        (item) =>
+          `• ${item.name} x${item.qty} - ${formatMoney(item.total)}`
+      )
+      .join("%0A");
 
-      const finalPngDataUrl = await buildFinalExportImage();
-      const finalBlob = dataUrlToBlob(finalPngDataUrl);
-      const phone = normalizePhoneForWhatsApp(customerPhone);
+    const text =
+      `*${BUSINESS.name}*%0A` +
+      `Invoice: ${invoiceNo}%0A` +
+      `Date: ${formatInvoiceDate(invoiceDate)}%0A` +
+      `Customer: ${customerName || "-"}%0A%0A` +
+      `${lines}%0A%0A` +
+      `*Balance Due:* ${formatMoney(balanceDue)}`;
 
-      const text =
-        `${BUSINESS.name}\n` +
-        `Invoice: ${invoiceNo}\n` +
-        `Date: ${formatInvoiceDate(invoiceDate)}\n` +
-        `Customer: ${customerName || "-"}\n` +
-        `Balance Due: ${formatMoney(balanceDue)}`;
+    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+  }
 
-      const imageFile = new File([finalBlob], `${invoiceNo}.png`, {
-        type: "image/png",
-      });
+  async function downloadJPEG() {
+    if (!invoiceRef.current) return;
 
-      const nav = navigator as Navigator & {
-        canShare?: (data?: ShareData) => boolean;
-        share?: (data?: ShareData) => Promise<void>;
-      };
+    await waitForImages(invoiceRef.current);
 
-      if (
-        nav.share &&
-        nav.canShare &&
-        nav.canShare({ files: [imageFile] })
-      ) {
-        await nav.share({
-          files: [imageFile],
-          title: invoiceNo,
-          text,
-        });
-      } else {
-        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-        window.open(waUrl, "_blank");
-        await downloadDataUrl(`${invoiceNo}.png`, finalPngDataUrl);
-      }
-    } catch {
-      setMessage("WhatsApp share failed.");
-    } finally {
-      setExporting(false);
+    const dataUrl = await toJpeg(invoiceRef.current, {
+      quality: 0.95,
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+    });
+
+    const link = document.createElement("a");
+    link.download = `${invoiceNo}.jpeg`;
+    link.href = dataUrl;
+    link.click();
+  }
+
+  async function downloadPDF() {
+    if (!invoiceRef.current) return;
+
+    await waitForImages(invoiceRef.current);
+
+    const dataUrl = await toPng(invoiceRef.current, {
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+    });
+
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const imgProps = pdf.getImageProperties(dataUrl);
+    const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+
+    pdf.addImage(dataUrl, "PNG", 0, 0, pageWidth, imgHeight);
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    if (isIOS) {
+      const blob = pdf.output("blob");
+      const url = URL.createObjectURL(blob);
+      window.location.href = url;
+    } else {
+      pdf.save(`${invoiceNo}.pdf`);
     }
   }
 
@@ -649,9 +483,7 @@ export default function Page() {
       <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
         <div className="rounded-[28px] bg-white p-4 shadow-lg md:p-6">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-slate-900">
-              Invoice Builder
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900">Invoice Builder</h1>
             <p className="mt-1 text-sm text-slate-500">
               The Sports Land billing system
             </p>
@@ -663,9 +495,7 @@ export default function Page() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Invoice Number
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Invoice Number</label>
                   <input
                     value={invoiceNo}
                     readOnly
@@ -737,9 +567,7 @@ export default function Page() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Customer Name
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Customer Name</label>
                   <input
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
@@ -748,9 +576,7 @@ export default function Page() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Customer Phone
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Customer Phone</label>
                   <input
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
@@ -759,9 +585,7 @@ export default function Page() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Customer Address
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Customer Address</label>
                   <textarea
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
@@ -842,17 +666,13 @@ export default function Page() {
                           <div className="space-y-2">
                             <input
                               value={editingProductName}
-                              onChange={(e) =>
-                                setEditingProductName(e.target.value)
-                              }
+                              onChange={(e) => setEditingProductName(e.target.value)}
                               className="w-full rounded-xl border border-slate-300 px-4 py-2"
                             />
                             <input
                               type="number"
                               value={editingProductPrice}
-                              onChange={(e) =>
-                                setEditingProductPrice(e.target.value)
-                              }
+                              onChange={(e) => setEditingProductPrice(e.target.value)}
                               className="w-full rounded-xl border border-slate-300 px-4 py-2"
                             />
                             <div className="flex gap-2">
@@ -918,20 +738,14 @@ export default function Page() {
                                   pattern="[0-9]*"
                                   value={selected.qty === 0 ? "" : selected.qty}
                                   onChange={(e) => {
-                                    const value = e.target.value.replace(
-                                      /\D/g,
-                                      ""
-                                    );
+                                    const value = e.target.value.replace(/\D/g, "");
 
                                     if (value === "") {
                                       changeQty(selected.productId, 0);
                                       return;
                                     }
 
-                                    changeQty(
-                                      selected.productId,
-                                      Number(value)
-                                    );
+                                    changeQty(selected.productId, Number(value));
                                   }}
                                   className="w-full rounded-xl border border-slate-300 px-4 py-2"
                                 />
@@ -963,27 +777,24 @@ export default function Page() {
 
               <button
                 onClick={sendWhatsAppInvoice}
-                disabled={exporting}
-                className="rounded-xl bg-green-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
+                className="rounded-xl bg-green-600 px-4 py-3 font-semibold text-white"
               >
-                {exporting ? "Preparing..." : "Send by WhatsApp"}
+                Send by WhatsApp
               </button>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
                   onClick={downloadPDF}
-                  disabled={exporting}
-                  className="rounded-xl bg-black px-4 py-3 font-semibold text-white disabled:opacity-60"
+                  className="rounded-xl bg-black px-4 py-3 font-semibold text-white"
                 >
-                  {exporting ? "Preparing..." : "Download PDF"}
+                  Download PDF
                 </button>
 
                 <button
                   onClick={downloadJPEG}
-                  disabled={exporting}
-                  className="rounded-xl bg-slate-200 px-4 py-3 font-semibold text-slate-900 disabled:opacity-60"
+                  className="rounded-xl bg-slate-200 px-4 py-3 font-semibold text-slate-900"
                 >
-                  {exporting ? "Preparing..." : "Download JPEG"}
+                  Download JPEG
                 </button>
               </div>
             </div>
@@ -994,18 +805,13 @@ export default function Page() {
           <div className="overflow-x-auto">
             <div
               ref={invoiceRef}
-              style={{
-                backgroundColor: "#ffffff",
-                color: "#111827",
-                width: `${PREVIEW_WIDTH}px`,
-                minHeight: `${PREVIEW_MIN_HEIGHT}px`,
-              }}
-              className="mx-auto bg-white p-5 md:p-8"
+              style={{ backgroundColor: "#ffffff", color: "#111827" }}
+              className="mx-auto w-full max-w-[794px] bg-white p-5 md:p-8"
             >
               <div className="flex items-start justify-between gap-4 border-b border-slate-300 pb-5">
                 <div className="flex items-center gap-3">
                   <img
-                    src={LOGO_PATH}
+                    src={LOGO_SRC}
                     alt="The Sports Land Logo"
                     className="h-10 w-10 object-contain"
                   />
@@ -1015,7 +821,7 @@ export default function Page() {
                       {BUSINESS.name}
                     </h1>
                     <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                      {BUSINESS.tagline}
+                      Quality you need
                     </p>
                   </div>
                 </div>
@@ -1024,9 +830,7 @@ export default function Page() {
                   <h2 className="text-3xl font-bold tracking-[0.2em] text-[#191970]">
                     INVOICE
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {BUSINESS.website}
-                  </p>
+                  <p className="mt-1 text-sm text-slate-500">{BUSINESS.website}</p>
                 </div>
               </div>
 
@@ -1049,34 +853,19 @@ export default function Page() {
                     {formatInvoiceDate(invoiceDate)}
                   </p>
                   <p>
-                    <span className="font-semibold">DUE DATE:</span>{" "}
-                    {BUSINESS.dueText}
+                    <span className="font-semibold">DUE DATE:</span> {BUSINESS.dueText}
                   </p>
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[24px] border border-slate-200">
+              <div className="overflow-hidden rounded-xl border border-slate-200">
                 <table className="w-full border-collapse text-sm">
-                  <thead
-                    className="text-white"
-                    style={{
-                      background:
-                        "linear-gradient(90deg, #191970 0%, #1f2d96 45%, #27408b 100%)",
-                    }}
-                  >
+                  <thead className="bg-gradient-to-r from-[#191970] to-[#27408b] text-white">
                     <tr>
-                      <th className="px-4 py-4 text-left font-semibold">
-                        Description
-                      </th>
-                      <th className="px-4 py-4 text-center font-semibold">
-                        Quantity
-                      </th>
-                      <th className="px-4 py-4 text-right font-semibold">
-                        Unit price
-                      </th>
-                      <th className="px-4 py-4 text-right font-semibold">
-                        Amount
-                      </th>
+                      <th className="px-4 py-3 text-left font-semibold">Description</th>
+                      <th className="px-4 py-3 text-center font-semibold">Quantity</th>
+                      <th className="px-4 py-3 text-right font-semibold">Unit price</th>
+                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
                     </tr>
                   </thead>
 
@@ -1085,7 +874,7 @@ export default function Page() {
                       <tr>
                         <td
                           colSpan={4}
-                          className="px-4 py-10 text-center text-slate-500"
+                          className="px-4 py-8 text-center text-slate-500"
                         >
                           No items selected
                         </td>
@@ -1096,12 +885,12 @@ export default function Page() {
                           key={item.productId}
                           className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
                         >
-                          <td className="px-4 py-5">{item.name}</td>
-                          <td className="px-4 py-5 text-center">{item.qty}</td>
-                          <td className="px-4 py-5 text-right">
+                          <td className="px-4 py-4">{item.name}</td>
+                          <td className="px-4 py-4 text-center">{item.qty}</td>
+                          <td className="px-4 py-4 text-right">
                             {formatMoney(item.price)}
                           </td>
-                          <td className="px-4 py-5 text-right">
+                          <td className="px-4 py-4 text-right">
                             {formatMoney(item.total)}
                           </td>
                         </tr>
@@ -1111,14 +900,8 @@ export default function Page() {
                 </table>
               </div>
 
-              <div className="mt-10 flex justify-end">
-                <div
-                  className="w-[420px] px-6 py-5 text-2xl font-bold text-white"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, #000000 0%, #000000 28%, #041124 45%, #273a5b 68%, #b7bcc7 86%, #f2f2f2 100%)",
-                  }}
-                >
+              <div className="mt-8 flex justify-end">
+                <div className="w-full max-w-sm bg-gradient-to-r from-black via-slate-800 to-white px-5 py-4 text-xl font-bold text-white">
                   <div className="flex items-center justify-between">
                     <span>BALANCE DUE</span>
                     <span>{formatMoney(balanceDue)}</span>
@@ -1126,7 +909,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-16 grid grid-cols-3 gap-6 border-t border-slate-300 pt-5 text-sm">
+              <div className="mt-12 grid grid-cols-3 gap-6 border-t border-slate-300 pt-5 text-sm">
                 <div>
                   <p className="font-semibold uppercase tracking-wide text-slate-500">
                     Phone
@@ -1149,12 +932,6 @@ export default function Page() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="mx-auto mt-4 max-w-7xl text-xs text-slate-500">
-        WhatsApp image sharing works best on phones that support the browser
-        share sheet. On browsers that don’t allow direct file share to WhatsApp,
-        the image downloads and WhatsApp opens with the invoice text.
       </div>
     </div>
   );
