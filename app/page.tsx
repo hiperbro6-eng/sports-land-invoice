@@ -123,6 +123,9 @@ export default function Page() {
 
   useEffect(() => {
     void loadInitialData();
+    loadProducts();
+  loadNextInvoiceNumber();
+  loadCustomerHistory("");
   }, []);
 
   async function loadInitialData() {
@@ -130,24 +133,28 @@ export default function Page() {
   }
 
   async function loadNextInvoiceNumber() {
-    const { data, error } = await supabase
-      .from("invoices")
-      .select("invoice_no")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
 
-    if (error) {
-      setInvoiceNo("INV0001");
-      return;
-    }
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("invoice_no");
 
-    const lastInvoice = data?.invoice_no ?? "";
-    const lastNumber = Number(lastInvoice.replace(/[^\d]/g, ""));
-    const nextNumber = Number.isFinite(lastNumber) && lastNumber > 0 ? lastNumber + 1 : 1;
-
-    setInvoiceNo(`INV${String(nextNumber).padStart(4, "0")}`);
+  if (error || !data) {
+    setInvoiceNo("INV0001");
+    return;
   }
+
+  let highest = 0;
+
+  data.forEach((row) => {
+    const num = parseInt(row.invoice_no.replace(/\D/g, ""));
+    if (num > highest) highest = num;
+  });
+
+  const next = highest + 1;
+
+  setInvoiceNo(`INV${String(next).padStart(4, "0")}`);
+
+}
 
   async function loadProducts() {
     setLoadingProducts(true);
@@ -393,7 +400,9 @@ export default function Page() {
     setMessage("Invoice saved.");
     await loadCustomerHistory(customerSearch);
     await loadNextInvoiceNumber();
+    await loadNextInvoiceNumber();
   }
+  
 
   function fillCustomerFromHistory(row: InvoiceRecord) {
     setCustomerName(row.customer_name ?? "");
