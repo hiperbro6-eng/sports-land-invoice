@@ -33,7 +33,7 @@ const BUSINESS = {
   website: "www.sportland.com",
   phone: "+94 72 929 958",
   email: "sportland@gmail.com",
-  address: "Negombo, Sri Lanka",
+  address: "Aluthgama, Sri Lanka",
   dueText: "On receipt",
 };
 
